@@ -4,12 +4,14 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolveCtaColors } from './cta-colors.mjs';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import http from 'node:http';
+import { randomBytes } from 'node:crypto';
 
 const require=createRequire(import.meta.url);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const { resolveStudioRoot } = require('./studio-root.cjs');
 const studioRoot = resolveStudioRoot(scriptDir, path.dirname(scriptDir));
+const { chromeScreenshot } = require(studioRoot ? path.join(studioRoot, 'tools/carousel-builder/lib/render.js') : '../../carousel-builder/lib/render.js');
 
 export function parseArgs(args) {
   const result = {};
@@ -47,6 +49,17 @@ function safeCss(value, fallback) {
   return /[;{}<>]/.test(text) ? fallback : text;
 }
 
+function imageDataUrl(file) {
+  const imagePath = path.resolve(file);
+  const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' }[path.extname(imagePath).toLowerCase()];
+  if (!mime) throw new Error('Supplied image must be PNG, JPEG, WebP or GIF.');
+  if (fs.statSync(imagePath).size > 16 * 1024 * 1024) throw new Error('Supplied image exceeds 16 MiB.');
+  const bytes = fs.readFileSync(imagePath);
+  const valid = mime === 'image/png' ? bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : mime === 'image/jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : mime === 'image/webp' ? bytes.subarray(0,4).toString() === 'RIFF' && bytes.subarray(8,12).toString() === 'WEBP' : /^GIF8[79]a$/.test(bytes.subarray(0,6).toString());
+  if (!valid) throw new Error('Supplied image bytes do not match its image format.');
+  return `data:${mime};base64,${bytes.toString('base64')}`;
+}
+
 export function makeHtml(template, data, width, height) {
   const brand = data.brand || {};
   const colors = brand.colors || {};
@@ -65,7 +78,7 @@ export function makeHtml(template, data, width, height) {
     DISPLAY_FONT: safeCss(fonts.display, 'Georgia'), BODY_FONT: safeCss(fonts.body, 'Arial'), BRAND: data.brandName || brand.brandName || 'Your business',
     HOOK: data.hook || data.headline || '', HEADLINE: data.headline || '', BODY: data.body || '', CTA: data.cta || '',
     TIP1: data.tips?.[0] || data.tip1 || '', TIP2: data.tips?.[1] || data.tip2 || '', TIP3: data.tips?.[2] || data.tip3 || '', PROOF: data.proof || '',
-    IMAGE_SRC: data.image ? pathToFileURL(path.resolve(data.image)).href : ''
+    IMAGE_SRC: data.image ? imageDataUrl(data.image) : ''
   };
   let html = template.replace('--w:1080px;--h:1080px', `--w:${width}px;--h:${height}px`);
   if (Number(height) / Number(width) === 1920 / 1080) {
@@ -164,19 +177,36 @@ export async function render({ templatePath, dataPath, data: suppliedData, outPa
   const temp = path.join(tempRoot, `ad-creative-${process.pid}-${Date.now()}.html`);
   fs.writeFileSync(temp, html);
   fs.mkdirSync(path.dirname(path.resolve(outPath)), { recursive: true });
-  const url=pathToFileURL(temp).href;
   const finalPath=path.resolve(outPath);
   const renderPath=path.join(tempRoot, `render-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.png`);
   try{
-    let result;
-    for(const executablePath of [...new Set([browser,...findBrowsers()])]){
-      result=spawnSync(executablePath,['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files',`--window-size=${Number(width)},${Number(height)}`,`--screenshot=${renderPath}`,'--dump-dom',url],{encoding:'utf8',maxBuffer:8*1024*1024});
-      if(result.status===0&&fs.existsSync(renderPath))break;
-    }
-    if(!result||result.status!==0||!fs.existsSync(renderPath))throw new Error('Install Google Chrome, Chromium or Microsoft Edge to run the browser renderer.');
-    const encoded=[...result.stdout.matchAll(/<pre id="render-measurements"[^>]*>([^<]+)<\/pre>/g)].at(-1)?.[1];
-    if(!encoded)throw new Error('Browser did not return the renderer measurements.');
-    const diagnostics=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
+    // Keep capture and layout measurements in the same isolated browser page.
+    // The bundled capture driver sets the exact viewport and waits for paint.
+    const token = randomBytes(24).toString('hex');
+    let resolveMeasurements;
+    const measured = new Promise(resolve => { resolveMeasurements = resolve; });
+    const server = http.createServer((request, response) => {
+      if (request.url === `/${token}` && request.method === 'GET') {
+        response.setHeader('Content-Type', 'text/html; charset=utf-8');
+        const notify = `<script>addEventListener('load',()=>{const node=document.getElementById('render-measurements');if(node)fetch('/${token}/measurements',{method:'POST',body:node.textContent})})</script>`;
+        response.end(html.replace('</body>', `${notify}</body>`));
+      } else if (request.url === `/${token}/measurements` && request.method === 'POST') {
+        let body = '';
+        request.on('data', chunk => { body += chunk; if (body.length > 2 * 1024 * 1024) request.destroy(); });
+        request.on('end', () => { resolveMeasurements(body); response.end('OK'); });
+      } else { response.statusCode = 404; response.end(); }
+    });
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    let encoded;
+    try {
+      const address = server.address();
+      const capture = await chromeScreenshot({ chromePath: browser, url: `http://127.0.0.1:${address.port}/${token}`, out: renderPath, width: Number(width), height: Number(height), settle: measured, settleMs: 3000, timeoutMs: 30000 });
+      if (capture.cornerCheck?.ok === false) throw new Error('Browser capture failed its paint check; no creative was accepted.');
+      // A capture without measured QA data must never be accepted.
+      encoded = await Promise.race([measured, new Promise(resolve => { const timer = setTimeout(() => resolve(null), 1000); timer.unref(); })]);
+    } finally { await new Promise(resolve => server.close(resolve)); }
+    if (!encoded) throw new Error('Browser did not return the renderer measurements.');
+    const diagnostics = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
     const overflows=diagnostics.elements.filter(item=>item.overflow);
     if(overflows.length){
       const details=overflows.map(item=>`${item.selector} (${item.fontSize}px at ${item.rect.x},${item.rect.y} ${item.rect.width}x${item.rect.height}, scroll ${item.scrollWidth}x${item.scrollHeight} client ${item.clientWidth}x${item.clientHeight}${item.overlaps.length?`, overlaps ${item.overlaps.join(',')}`:''})`).join(', ');

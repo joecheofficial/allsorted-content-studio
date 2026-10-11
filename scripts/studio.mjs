@@ -13,17 +13,23 @@ function say(x) { console.log(x); }
 function ensureLearnings() { const file=path.join(STUDIO,'learnings/LEARNINGS.md'); if(!fs.existsSync(file)){fs.mkdirSync(path.dirname(file),{recursive:true});fs.copyFileSync(path.join(STUDIO,'learnings/LEARNINGS.template.md'),file);} }
 function filesBelow(dir) { if (!fs.existsSync(dir)) return []; return fs.readdirSync(dir, {withFileTypes:true}).flatMap(e => e.isDirectory() ? (e.name === '.carousel' || e.name === '.git' || e.name === 'node_modules' ? [] : filesBelow(path.join(dir,e.name))) : [path.join(dir,e.name)]); }
 function run(cmd, args, env={}) { return spawnSync(cmd,args,{cwd:STUDIO,encoding:'utf8',env:{...process.env,CONTENT_STUDIO_DIR:STUDIO,...env}}); }
-function createSheet(runDir) {
+async function createSheet(runDir) {
   const browserPaths=findBrowsers();if(!browserPaths.length)throw new Error('Install Google Chrome, Chromium or Microsoft Edge to build a contact sheet.');
   const imgs = filesBelow(runDir).filter(f => /\.(png|jpe?g|webp)$/i.test(f) && path.basename(f) !== 'contact-sheet.png');
   if (!imgs.length) throw new Error('No creative images found in run directory.');
   const cards = imgs.map(f => { const ext=path.extname(f).toLowerCase(); const mime=ext==='.jpg'||ext==='.jpeg'?'image/jpeg':ext==='.webp'?'image/webp':'image/png'; const data=fs.readFileSync(f).toString('base64'); return `<figure><img src="data:${mime};base64,${data}"><figcaption>${path.relative(runDir,f).replaceAll('&','&amp;').replaceAll('<','&lt;')}</figcaption></figure>`; }).join('');
   const html = `<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;padding:28px;background:#f2efe8;color:#20231f;font:16px Arial,sans-serif}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}figure{margin:0;padding:12px;background:white;border-radius:10px;box-shadow:0 2px 10px #0002}img{display:block;width:100%;height:450px;object-fit:contain;background:#ddd}figcaption{padding:10px 2px 2px;overflow-wrap:anywhere;font-size:13px}</style><main class="grid">${cards}</main>`;
   const out = path.join(runDir, 'contact-sheet.png');
-  const htmlFile=path.join(STUDIO,'.test-data','contact-sheet.html');fs.mkdirSync(path.dirname(htmlFile),{recursive:true});fs.writeFileSync(htmlFile,html);
+  const capturePath=path.join(runDir,`.contact-sheet-${process.pid}-${Date.now()}.png`);
+  const htmlFile=path.join(STUDIO,'.test-data',`contact-sheet-${process.pid}-${Date.now()}.html`);fs.mkdirSync(path.dirname(htmlFile),{recursive:true});fs.writeFileSync(htmlFile,html);
   const height=Math.min(Math.max(1100,Math.ceil(imgs.length/3)*540+56),12000);
-  for(const browser of browserPaths){const shot=spawnSync(browser,[`--headless`,`--no-sandbox`,`--disable-gpu`,`--hide-scrollbars`,`--window-size=1440,${height}`,`--screenshot=${out}`,`file://${htmlFile}`],{encoding:'utf8'});if(shot.status===0&&fs.existsSync(out)&&fs.statSync(out).size>1000)return out;}
-  throw new Error('Chrome/Chromium/Edge could not render the contact sheet.');
+  const { chromeScreenshot } = require(path.join(STUDIO,'tools/carousel-builder/lib/render.js'));
+  try {
+    const capture=await chromeScreenshot({chromePath:browserPaths[0],url:pathToFileURL(htmlFile).href,out:capturePath,width:1440,height,timeoutMs:30000});
+    if(capture.cornerCheck?.ok === false)throw new Error('Contact sheet failed paint checks: '+(capture.cornerCheck.issues||[]).join('; '));
+    if(!fs.existsSync(capturePath)||fs.statSync(capturePath).size<=1000)throw new Error('Browser returned an incomplete contact sheet.');
+    fs.renameSync(capturePath,out);return out;
+  } finally { fs.rmSync(htmlFile,{force:true});fs.rmSync(capturePath,{force:true}); }
 }
 function check(runDir) {
   ensureLearnings();
