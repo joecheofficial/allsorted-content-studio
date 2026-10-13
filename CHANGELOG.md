@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2 (2026-10-13)
+
+- Carousel Builder engine updated from v1.2.0 to v1.2.1 (renderer only): one headless browser renders a whole deck, each slide a tab, instead of one browser per slide; a headless-only Chrome is preferred so nothing flashes in the Dock; a browser that dies mid-deck fails the remaining slides at once instead of hanging. The engine's own self-updater is not included, Content Studio's weekly update covers it.
+- Fixed: with only the regular Chrome app installed (no headless shell), every carousel slide and the contact sheet failed with "Target position can only be set for new windows". The renderer now opens each tab without a window size and sets the slide size on the page itself. New test renders through the real Chrome app.
+
+## 1.2.1 (2026-10-11)
+
+- Reliable browser capture and installed image rendering for Ad Images.
+
 ## 1.2.0 (2026-10-04)
 
 - New sixth tool, Launch Video: the open-source /brag skill (latent-spaces/brag 0.4.0, MIT, pinned in `tools/launch-video/PINNED`). It turns a website or project into a 15 to 25 second launch video with music, a poster frame and share copy. The installer adds the `brag` and `brag-slim` skills and a `content-launch-video` worker.
