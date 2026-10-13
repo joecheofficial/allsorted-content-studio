@@ -1,8 +1,16 @@
 Upstream: https://github.com/josephtandle/carousel-builder
-Tag: v1.2.0
-Commit: ccfc768
-Date: 2026-10-02
+Tag: v1.2.1
+Commit: 101b696 (engine code; v1.2.1 tag 97c3385 adds only the licence)
+Date: 2026-10-03
 Copied from the verified engine snapshot without .git
 
 Local Content Studio kit adaptation: display headings use weight 700; the closing layout renders the run's
 button wording in a readable, normal-case button with its supporting line below. Engine source is unchanged.
+
+From v1.2.1 we took the renderer only (lib/render.js, lib/panorama.js, render.mjs, test/render-browser.test.js, README browser
+note, package version). Not taken: the engine's own self-updater (scripts/self-update.js, `carousel update`, install.sh
+hook), because Content Studio's weekly updater already updates the whole clone. Engine licence line stays the Studio's.
+
+Local fix on top of v1.2.1 (2026-10-13): lib/render.js opens each tab with Target.createTarget { url } only. Passing
+width/height made the Chrome app (no headless shell) reject every capture with "Target position can only be set for
+new windows". Regression test at the end of test/render-browser.test.js. Send upstream.
