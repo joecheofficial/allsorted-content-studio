@@ -47,8 +47,14 @@ if (process.env.CONTENT_STUDIO_SKIP_HYPERFRAMES === '1') {
   process.exit(0);
 }
 
+// Windows .cmd shims (npx, npm-installed claude) need a shell; quote everything so a
+// path with spaces (C:\Program Files\nodejs) survives.
 function run(cmd, args, extraEnv = {}, timeout = 600000) {
-  const r = spawnSync(cmd, args, { env: { ...env, ...hf.RUN_ENV, ...extraEnv }, encoding: 'utf8', timeout, shell: isWin && !/\.(exe|com)$/i.test(cmd) });
+  const options = { env: { ...env, ...hf.RUN_ENV, ...extraEnv }, encoding: 'utf8', timeout };
+  const viaShell = isWin && !/\.(exe|com)$/i.test(cmd);
+  const r = viaShell
+    ? spawnSync([cmd, ...args].map((part) => `"${String(part).replace(/"/g, '""')}"`).join(' '), { ...options, shell: true })
+    : spawnSync(cmd, args, options);
   const output = `${r.stdout || ''}${r.stderr || ''}`.trim();
   return { ok: !r.error && r.status === 0, output: r.error ? r.error.message : output };
 }
@@ -67,17 +73,21 @@ if (d.installed) {
   const claude = hf.onPath('claude', env);
   const codex = hf.onPath('codex', env) || fs.existsSync(path.join(home, '.codex'));
   if (claude) {
+    say('Installing the HyperFrames plugin for Claude Code (a minute or two)...');
     const add = run(claude, ['plugin', 'marketplace', 'add', 'heygen-com/hyperframes']);
     if (!add.ok && !/already/i.test(add.output)) row('Claude Code marketplace', 'failed', tail(add.output));
     const inst = run(claude, ['plugin', 'install', 'hyperframes@hyperframes']);
     row('Claude Code plugin', inst.ok ? 'installed' : 'failed', inst.ok ? 'restart Claude Code to load the skills' : tail(inst.output));
+    if (!inst.ok) asks.push('The HyperFrames plugin did not install. Check the internet connection, then run the HyperFrames setup prompt in tools/video-editor/INSTALL-HYPERFRAMES.md.');
   }
   if (codex) {
     // Non-interactive form of `npx skills add heygen-com/hyperframes` + "Core Skills": installs
     // exactly the core set, which is what HyperFrames documents for agent runs.
+    say('Installing the HyperFrames core skills for Codex (a minute or two)...');
     const npx = hf.onPath('npx', env) || 'npx';
     const skills = run(npx, ['-y', 'hyperframes', 'skills', 'update'], { HYPERFRAMES_NO_AUTO_INSTALL: '' });
     row('Codex skills', skills.ok ? 'installed' : 'failed', skills.ok ? 'core skills' : tail(skills.output));
+    if (!skills.ok) asks.push('The HyperFrames skills for Codex did not install. Check the internet connection, then run the HyperFrames setup prompt in tools/video-editor/INSTALL-HYPERFRAMES.md.');
   }
   if (!claude && !codex) {
     row('HyperFrames', 'not installed', 'no Claude Code or Codex command found');
@@ -90,7 +100,8 @@ if (d.installed) {
 if (!d.deps.ffmpeg && !checkOnly) {
   const brew = hf.onPath('brew', env);
   if (brew) {
-    const r = run(brew, ['install', 'ffmpeg'], {}, 1800000);
+    say('Installing FFmpeg with Homebrew (this can take several minutes)...');
+    const r = run(brew, ['install', 'ffmpeg'], { HOMEBREW_NO_AUTO_UPDATE: '1', HOMEBREW_NO_INSTALL_CLEANUP: '1' }, 1800000);
     row('FFmpeg', r.ok ? 'installed with Homebrew' : 'failed', r.ok ? '' : tail(r.output));
     d = hf.detect({ home, env });
   }
@@ -112,16 +123,22 @@ if (isWin) {
     row('Telemetry off', a.ok && b.ok ? 'set for your user' : 'failed', a.ok && b.ok ? '' : tail(a.output || b.output));
   }
 } else {
-  const shell = path.basename(process.env.SHELL || '');
-  const profile = path.join(home, shell === 'bash' ? '.bashrc' : shell === 'zsh' || process.platform === 'darwin' ? '.zshrc' : '.profile');
+  // The file the member's own terminal reads: zsh -> .zshrc; bash -> .bash_profile on
+  // macOS (login shells), .bashrc elsewhere; fish -> conf.d; anything else -> .profile.
+  const shell = path.basename(process.env.SHELL || (process.platform === 'darwin' ? 'zsh' : ''));
+  const fish = shell === 'fish';
+  const profile = fish ? path.join(home, '.config', 'fish', 'conf.d', 'allsorted-hyperframes.fish')
+    : path.join(home, shell === 'zsh' ? '.zshrc' : shell === 'bash' ? (process.platform === 'darwin' ? '.bash_profile' : '.bashrc') : '.profile');
+  const block = fish ? `\n${marker}\nset -gx HYPERFRAMES_NO_TELEMETRY 1\nset -gx DO_NOT_TRACK 1\n` : exportsBlock;
   let text = '';
   try { text = fs.readFileSync(profile, 'utf8'); } catch { /* new file */ }
-  const hasBoth = /^\s*export\s+HYPERFRAMES_NO_TELEMETRY=1\s*$/m.test(text) && /^\s*export\s+DO_NOT_TRACK=1\s*$/m.test(text);
+  const hasBoth = fish ? /HYPERFRAMES_NO_TELEMETRY 1/.test(text) && /DO_NOT_TRACK 1/.test(text)
+    : /^\s*export\s+HYPERFRAMES_NO_TELEMETRY=1\s*$/m.test(text) && /^\s*export\s+DO_NOT_TRACK=1\s*$/m.test(text);
   if (hasBoth) row('Telemetry off', 'ok', path.basename(profile));
   else if (checkOnly) row('Telemetry off', 'not in profile', path.basename(profile));
   else {
-    try { fs.appendFileSync(profile, exportsBlock); row('Telemetry off', 'added', path.basename(profile)); }
-    catch (error) { row('Telemetry off', 'failed', error.message); asks.push(`Please add these two lines to your shell profile: export HYPERFRAMES_NO_TELEMETRY=1 and export DO_NOT_TRACK=1.`); }
+    try { fs.mkdirSync(path.dirname(profile), { recursive: true }); fs.appendFileSync(profile, block); row('Telemetry off', 'added', path.basename(profile)); }
+    catch (error) { row('Telemetry off', 'failed', error.message); asks.push('Please add these two lines to your shell profile: export HYPERFRAMES_NO_TELEMETRY=1 and export DO_NOT_TRACK=1.'); }
   }
 }
 
@@ -129,6 +146,7 @@ if (isWin) {
 if (!d.installed) row('Doctor', 'skipped', 'HyperFrames is not installed');
 else if (checkOnly || noDoctor) row('Doctor', 'not run', '');
 else {
+  say('Running the HyperFrames doctor...');
   const doc = hf.runDoctor(d, { cwd: STUDIO, env });
   row('Doctor', !doc.ran ? 'skipped' : doc.ok ? 'passed' : 'reported problems', !doc.ran ? tail(doc.output) : doc.ok ? '' : tail(doc.output));
 }

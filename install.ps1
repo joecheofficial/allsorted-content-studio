@@ -61,11 +61,6 @@ $env:CONTENT_STUDIO_DIR=$dir
 & $node.Source (Join-Path $dir 'scripts/studio.mjs') self-test --no-render
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# HyperFrames for the Video Editor is part of the standard install (see install.sh).
-# It always lets the install finish. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
-& $node.Source (Join-Path $dir 'scripts/hyperframes-setup.mjs') --home $installHome
-if ($LASTEXITCODE -ne 0) { Write-Output "HyperFrames setup did not finish. Run the prompt in $(Join-Path $dir 'tools/video-editor/INSTALL-HYPERFRAMES.md')" }
-
 # Weekly self-update: on by default. Set CONTENT_STUDIO_SKIP_UPDATES=1 to skip.
 $updateRoot = $null
 if (Test-Path (Join-Path $src '.git')) { $updateRoot = $src } elseif (Test-Path (Join-Path $dir '.git')) { $updateRoot = $dir }
@@ -78,3 +73,8 @@ if ($env:CONTENT_STUDIO_SKIP_UPDATES -eq '1' -or $env:ALLSORTED_AUTO_UPDATE -eq 
   & $node.Source (Join-Path $updateRoot 'scripts/self-update.js') --register
   if ($LASTEXITCODE -ne 0) { Write-Output "Weekly updates could not be scheduled. Try later: node `"$(Join-Path $updateRoot 'scripts/self-update.js')`" --register" }
 }
+
+# HyperFrames for the Video Editor is part of the standard install (see install.sh).
+# It always lets the install finish. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
+& $node.Source (Join-Path $dir 'scripts/hyperframes-setup.mjs') --home $installHome
+if ($LASTEXITCODE -ne 0) { Write-Output "HyperFrames setup did not finish. Run the prompt in $(Join-Path $dir 'tools/video-editor/INSTALL-HYPERFRAMES.md')" }

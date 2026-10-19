@@ -278,6 +278,7 @@ function normalizeSegments(rawSegments, sourceDuration, maxSeconds) {
     if (!(end > start)) throw new Error(`Segment ${i + 1} ends before it starts (${segment.start} to ${segment.end}).`);
     if (sourceDuration && start >= sourceDuration) throw new Error(`Segment ${i + 1} starts at ${formatTime(start)}, after the recording ends (${formatTime(sourceDuration)}).`);
     const clippedEnd = sourceDuration ? Math.min(end, sourceDuration) : end;
+    if (clippedEnd - start < 0.1) throw new Error(`Segment ${i + 1} is shorter than a tenth of a second once it is clipped to the end of the recording (${formatTime(sourceDuration || end)}).`);
     return { start, end: clippedEnd, label: segment.label ? String(segment.label) : null };
   });
   const total = out.reduce((sum, s) => sum + (s.end - s.start), 0);
@@ -330,28 +331,39 @@ function makeTeaser(input = {}) {
   }
   fs.mkdirSync(directory, { recursive: true });
 
-  // One filter graph: trim each moment, reset its clock, join them, then
-  // optionally fit a platform frame and fade in and out.
+  // Each moment is its own fast-seeking input, so ffmpeg decodes only the
+  // moments (in any order) instead of buffering the recording in memory. One
+  // filter graph joins them, fits the frame, and fades in and out.
   const fade = input.fade === false ? 0 : Math.min(0.4, total / 4);
+  const args = ["-n"];
   const parts = [];
   const joins = [];
   segments.forEach((s, i) => {
-    parts.push(`[0:v:0]trim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`);
-    if (streams.hasAudio) parts.push(`[0:a:0]atrim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
+    args.push("-ss", s.start.toFixed(3), "-t", (s.end - s.start).toFixed(3), "-i", file);
+    parts.push(`[${i}:v:0]setpts=PTS-STARTPTS[v${i}]`);
+    if (streams.hasAudio) parts.push(`[${i}:a:0]asetpts=PTS-STARTPTS[a${i}]`);
     joins.push(streams.hasAudio ? `[v${i}][a${i}]` : `[v${i}]`);
   });
   parts.push(`${joins.join("")}concat=n=${segments.length}:v=1:a=${streams.hasAudio ? 1 : 0}${streams.hasAudio ? "[vc][ac]" : "[vc]"}`);
   const videoChain = [];
   if (dims) videoChain.push(`scale=${dims.width}:${dims.height}:force_original_aspect_ratio=decrease`, `pad=${dims.width}:${dims.height}:(ow-iw)/2:(oh-ih)/2`, "setsar=1");
+  else videoChain.push("scale=trunc(iw/2)*2:trunc(ih/2)*2", "setsar=1");
   if (fade) videoChain.push(`fade=t=in:st=0:d=${fade.toFixed(3)}`, `fade=t=out:st=${(total - fade).toFixed(3)}:d=${fade.toFixed(3)}`);
   videoChain.push("format=yuv420p");
   parts.push(`[vc]${videoChain.join(",")}[vout]`);
   if (streams.hasAudio) parts.push(fade ? `[ac]afade=t=in:st=0:d=${fade.toFixed(3)},afade=t=out:st=${(total - fade).toFixed(3)}:d=${fade.toFixed(3)}[aout]` : "[ac]anull[aout]");
 
-  const args = ["-n", "-i", file, "-filter_complex", parts.join(";"), "-map", "[vout]"];
+  args.push("-filter_complex", parts.join(";"), "-map", "[vout]");
   if (streams.hasAudio) args.push("-map", "[aout]", "-c:a", "aac", "-b:a", "160k");
   args.push("-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", "-dn", "-map_chapters", "-1", "-map_metadata", "-1", output);
-  execFileSync(ffmpegBin, args, { stdio: "pipe" });
+  try {
+    execFileSync(ffmpegBin, args, { stdio: "pipe" });
+  } catch (error) {
+    // Never leave a half-written teaser behind: it would block a retry and look finished.
+    fs.rmSync(output, { force: true });
+    const detail = String(error.stderr || error.message || "").trim().split("\n").slice(-3).join(" ");
+    throw new Error(`ffmpeg could not make the teaser: ${detail}`);
+  }
 
   const result = {
     input: path.basename(file),

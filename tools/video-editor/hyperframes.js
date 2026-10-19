@@ -12,8 +12,10 @@
  * detect() only reads local files and PATH. It never downloads, installs, renders or
  * publishes. The one exception is the doctor step, run only when the member asks for
  * it: it goes through the plugin's own launcher, which may fetch the CLI version that
- * plugin pins the first time it runs (the plugin's documented behaviour). There is no
- * fallback to fetching an unpinned CLI from a package registry.
+ * plugin pins the first time it runs (the plugin's documented behaviour). Running and
+ * checking HyperFrames never falls back to an unpinned CLI from a package registry.
+ * (Installing it is separate: scripts/hyperframes-setup.mjs uses HyperFrames' own
+ * documented installers.)
  */
 
 const fs = require("node:fs");
@@ -35,7 +37,7 @@ function readJson(file) {
 
 function onPath(bin, env = process.env) {
   const dirs = String(env.PATH || "").split(path.delimiter).filter(Boolean);
-  const exts = process.platform === "win32" ? ["", ".exe", ".cmd", ".bat"] : [""];
+  const exts = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   for (const dir of dirs) {
     for (const ext of exts) {
       const candidate = path.join(dir, bin + ext);
@@ -87,10 +89,19 @@ function findStandaloneSkills(home) {
   return null;
 }
 
-function findChrome(env) {
+function findChrome(env, home = os.homedir()) {
   if (env.HYPERFRAMES_CHROME_PATH && fs.existsSync(env.HYPERFRAMES_CHROME_PATH)) return env.HYPERFRAMES_CHROME_PATH;
-  const mac = ["/Applications/Google Chrome.app", "/Applications/Chromium.app", "/Applications/Google Chrome Canary.app"];
-  if (process.platform === "darwin") for (const app of mac) if (fs.existsSync(app)) return app;
+  if (process.platform === "darwin") {
+    for (const base of ["/Applications", path.join(home, "Applications")]) {
+      for (const app of ["Google Chrome.app", "Chromium.app", "Google Chrome Canary.app"]) if (fs.existsSync(path.join(base, app))) return path.join(base, app);
+    }
+  }
+  if (process.platform === "win32") {
+    for (const base of [env.ProgramFiles, env["ProgramFiles(x86)"], env.LOCALAPPDATA].filter(Boolean)) {
+      const exe = path.join(base, "Google", "Chrome", "Application", "chrome.exe");
+      if (fs.existsSync(exe)) return exe;
+    }
+  }
   for (const bin of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"]) {
     const hit = onPath(bin, env);
     if (hit) return hit;
@@ -107,7 +118,7 @@ function detect({ home = os.homedir(), env = process.env, nodeVersion = process.
   const source = findClaudePlugin(home) || findCodexPlugin(home) || findStandaloneSkills(home);
   const cli = onPath("hyperframes", env);
   const nodeMajor = parseInt(String(nodeVersion).split(".")[0], 10) || 0;
-  const deps = { node: nodeMajor >= 22, nodeVersion, ffmpeg: onPath("ffmpeg", env), chrome: findChrome(env) };
+  const deps = { node: nodeMajor >= 22, nodeVersion, ffmpeg: onPath("ffmpeg", env), chrome: findChrome(env, home) };
   const installed = !!(source || cli);
   const missing = [];
   if (!installed) missing.push("hyperframes");

@@ -42,13 +42,6 @@ mkdir -p "$DEST" "$HOME_DIR"
 # Kept for compatibility: the pinned carousel engine has zero npm dependencies.
 CONTENT_STUDIO_DIR="$DEST" "$NODE" "$DEST/scripts/studio.mjs" self-test --no-render
 
-# HyperFrames for the Video Editor is part of the standard install: Claude Code plugin
-# or Codex core skills, FFmpeg through Homebrew when missing, telemetry off in the shell
-# profile, then the doctor check. Anything it cannot install is named in one plain
-# sentence. It always lets the install finish; the repair prompt is
-# tools/video-editor/INSTALL-HYPERFRAMES.md. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
-"$NODE" "$DEST/scripts/hyperframes-setup.mjs" --home "$HOME_DIR" || echo "HyperFrames setup did not finish. Run the prompt in $DEST/tools/video-editor/INSTALL-HYPERFRAMES.md"
-
 # Weekly self-update: on by default, one line turns it off. It fast-forwards the
 # git clone this installer came from, never touches brand/, learnings/, runs/ or
 # any file you made, backs up first and rolls back if the self-test fails.
@@ -63,3 +56,11 @@ elif [ -z "$UPDATE_ROOT" ]; then
 else
   "$NODE" "$UPDATE_ROOT/scripts/self-update.js" --register || echo "Weekly updates could not be scheduled. Try later: node \"$UPDATE_ROOT/scripts/self-update.js\" --register"
 fi
+
+# HyperFrames for the Video Editor (last, so the steps above are done even if this
+# step is interrupted) is part of the standard install: Claude Code plugin
+# or Codex core skills, FFmpeg through Homebrew when missing, telemetry off in the shell
+# profile, then the doctor check. Anything it cannot install is named in one plain
+# sentence. It always lets the install finish; the repair prompt is
+# tools/video-editor/INSTALL-HYPERFRAMES.md. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
+"$NODE" "$DEST/scripts/hyperframes-setup.mjs" --home "$HOME_DIR" || echo "HyperFrames setup did not finish. Run the prompt in $DEST/tools/video-editor/INSTALL-HYPERFRAMES.md"

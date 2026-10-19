@@ -130,6 +130,7 @@ test('make-teaser cuts chosen moments from a long recording into a 9:16 teaser w
   const made = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=25:duration=20', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=20', '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', src], { encoding: 'utf8' });
   assert.equal(made.status, 0, made.stderr);
   fs.writeFileSync(path.join(dir, 'webinar.vtt'), 'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nWelcome to the session\n\n00:00:05.000 --> 00:00:09.000\nThe one idea that matters\n\n00:00:12.000 --> 00:00:16.000\nJoin us next week\n');
+  fs.writeFileSync(path.join(dir, 'fake-ffmpeg.sh'), '#!/bin/sh\nif [ "$1" = "-version" ]; then exit 0; fi\nfor last; do :; done\n: > "$last"\necho "simulated encoder failure" >&2\nexit 1\n'); fs.chmodSync(path.join(dir, 'fake-ffmpeg.sh'), 0o755);
   const before = fs.readFileSync(src);
   const out = path.join(dir, 'video');
   const transcript = ve.readTranscript({ captionsFile: path.join(dir, 'webinar.vtt') });
@@ -148,6 +149,17 @@ test('make-teaser cuts chosen moments from a long recording into a 9:16 teaser w
   assert.throws(() => ve.makeTeaser({ file: src, segments: [{ start: 30, end: 32 }], outputDirectory: out, outputFilename: 'late.mp4' }), /after the recording ends/);
   assert.throws(() => ve.makeTeaser({ file: src, segments: [{ start: 4, end: 2 }], outputDirectory: out, outputFilename: 'backwards.mp4' }), /ends before it starts/);
   assert.throws(() => ve.makeTeaser({ file: src, segments: [{ start: 0, end: 15 }], maxSeconds: 10, outputDirectory: out, outputFilename: 'long.mp4' }), /over the 10 second teaser limit/);
+  assert.throws(() => ve.makeTeaser({ file: src, segments: [{ start: 19.95, end: 25 }], outputDirectory: out, outputFilename: 'sliver.mp4' }), /shorter than a tenth of a second/);
+  // Odd-sized source, no preset: kept to even dimensions instead of failing in the encoder.
+  const odd = path.join(dir, 'odd.mp4');
+  assert.equal(spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=641x361:rate=25:duration=4', '-c:v', 'mpeg4', odd]).status, 0);
+  const oddOut = ve.makeTeaser({ file: odd, segments: [{ start: 2, end: 3 }, { start: 0, end: 1 }], outputDirectory: out });
+  assert.equal(oddOut.hasAudio, false);
+  const oddProbe = JSON.parse(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', path.join(out, oddOut.output)], { encoding: 'utf8' }).stdout).streams[0];
+  assert.deepEqual([oddProbe.width, oddProbe.height], [640, 360]);
+  // A failed encode leaves no empty file behind to block the retry.
+  assert.throws(() => ve.makeTeaser({ file: odd, segments: [{ start: 0, end: 1 }], outputDirectory: out, outputFilename: 'broken.mp4', ffmpegBin: path.join(dir, 'fake-ffmpeg.sh') }), /simulated encoder failure/);
+  assert.equal(fs.existsSync(path.join(out, 'broken.mp4')), false);
   const check = ve.check();
   assert.equal(check.teaserAvailable, true);
 });
