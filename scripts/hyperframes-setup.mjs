@@ -113,6 +113,12 @@ if (!d.deps.node) asks.push(`Please install Node.js 22 or newer from nodejs.org 
 if (!d.deps.ffmpeg) asks.push(isWin ? 'Please install FFmpeg (for example `winget install ffmpeg`), then run the HyperFrames setup again.' : 'Please install FFmpeg (`brew install ffmpeg` on macOS or `sudo apt install ffmpeg` on Linux), then run the HyperFrames setup again.');
 if (!d.deps.chrome) asks.push('Please install Google Chrome, then run the HyperFrames setup again.');
 
+// macOS bash login shells read only the first of these that exists, so add to that one
+// and never create .bash_profile when it would hide an existing .profile.
+function macBashLogin(dir) {
+  return ['.bash_profile', '.bash_login', '.profile'].find((name) => fs.existsSync(path.join(dir, name))) || '.bash_profile';
+}
+
 // 4. Telemetry off for good.
 const marker = '# All Sorted Content Studio: HyperFrames telemetry off';
 const exportsBlock = `\n${marker}\nexport HYPERFRAMES_NO_TELEMETRY=1\nexport DO_NOT_TRACK=1\n`;
@@ -128,7 +134,7 @@ if (isWin) {
   const shell = path.basename(process.env.SHELL || (process.platform === 'darwin' ? 'zsh' : ''));
   const fish = shell === 'fish';
   const profile = fish ? path.join(home, '.config', 'fish', 'conf.d', 'allsorted-hyperframes.fish')
-    : path.join(home, shell === 'zsh' ? '.zshrc' : shell === 'bash' ? (process.platform === 'darwin' ? '.bash_profile' : '.bashrc') : '.profile');
+    : path.join(home, shell === 'zsh' ? '.zshrc' : shell === 'bash' ? (process.platform === 'darwin' ? macBashLogin(home) : '.bashrc') : '.profile');
   const block = fish ? `\n${marker}\nset -gx HYPERFRAMES_NO_TELEMETRY 1\nset -gx DO_NOT_TRACK 1\n` : exportsBlock;
   let text = '';
   try { text = fs.readFileSync(profile, 'utf8'); } catch { /* new file */ }

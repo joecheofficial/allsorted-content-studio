@@ -347,7 +347,7 @@ function makeTeaser(input = {}) {
   parts.push(`${joins.join("")}concat=n=${segments.length}:v=1:a=${streams.hasAudio ? 1 : 0}${streams.hasAudio ? "[vc][ac]" : "[vc]"}`);
   const videoChain = [];
   if (dims) videoChain.push(`scale=${dims.width}:${dims.height}:force_original_aspect_ratio=decrease`, `pad=${dims.width}:${dims.height}:(ow-iw)/2:(oh-ih)/2`, "setsar=1");
-  else videoChain.push("scale=trunc(iw/2)*2:trunc(ih/2)*2", "setsar=1");
+  else videoChain.push("scale=trunc(iw*sar/2)*2:trunc(ih/2)*2", "setsar=1");
   if (fade) videoChain.push(`fade=t=in:st=0:d=${fade.toFixed(3)}`, `fade=t=out:st=${(total - fade).toFixed(3)}:d=${fade.toFixed(3)}`);
   videoChain.push("format=yuv420p");
   parts.push(`[vc]${videoChain.join(",")}[vout]`);
