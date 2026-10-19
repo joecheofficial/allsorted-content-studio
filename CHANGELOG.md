@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 (2026-10-19)
+
+- Video Editor upgraded. HyperFrames (HeyGen's open-source HTML-to-MP4 renderer, Apache-2.0) is now part of the standard install: the installers add the Claude Code plugin or the Codex core skills, install FFmpeg with Homebrew when it is missing, turn telemetry off in your shell profile, run the doctor check and print a result table. Anything that needs you is named in one plain sentence. `CONTENT_STUDIO_SKIP_HYPERFRAMES=1` leaves it out.
+- New `tools/video-editor/INSTALL-HYPERFRAMES.md`: the setup and repair prompt the installer and the Video Editor both use. New `scripts/hyperframes-setup.mjs` does the same steps in one command.
+- New `hyperframes [--doctor] [--json]` command and `check-hyperframes` recipe. Runs go through the plugin's own launcher with telemetry, update checks and auto-install off. Never publishes and never renders in the cloud. The self-test shows a HyperFrames line; a missing HyperFrames does not fail the self-test, so weekly updates never roll back over it.
+- Ready HyperFrames edit prompts: finished 9:16 reel, 16:9 side panels around vertical footage, and polishing a teaser.
+- Long recording to short teaser: new `read-transcript` and `make-teaser` operations and recipes. Ask "turn this webinar recording into a short edited teaser": the agent reads the transcript, picks the moments, shows the plan, and cuts them in one FFmpeg pass with platform presets, fades and captions shifted onto the teaser timeline. No model bill, no upload. `check-video-tools` now also reports teaser support and any local transcriber.
+- Automatic clippers (OpenShorts, AI YouTube Shorts Generator, SupoClip, publikclip) are documented as optional installs with their licences; none is bundled.
+- Content director routes teasers, animated captions and HyperFrames setup to the Video Editor.
+- Includes the 1.2.2 Carousel Builder engine update and Chrome app capture fix.
+
 ## 1.2.2 (2026-10-13)
 
 - Carousel Builder engine updated from v1.2.0 to v1.2.1 (renderer only): one headless browser renders a whole deck, each slide a tab, instead of one browser per slide; a headless-only Chrome is preferred so nothing flashes in the Dock; a browser that dies mid-deck fails the remaining slides at once instead of hanging. The engine's own self-updater is not included, Content Studio's weekly update covers it.

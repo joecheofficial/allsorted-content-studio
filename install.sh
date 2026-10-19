@@ -25,7 +25,7 @@ if [ "$CHECK" -eq 1 ]; then
   CHECK_ROOT=$SRC
   [ -f "$DEST/scripts/studio.mjs" ] && CHECK_ROOT=$DEST
   REQUIRED_STATUS=0
-  for file in README.md DIRECTOR.md INSTALL-PROMPT.md AGENTS.md VERSION CHANGELOG.md package.json scripts/studio.mjs scripts/carousel.mjs scripts/install-files.mjs skill/SKILL.md docs/DATA-FORMATS.md brand/BRAND-BRAIN.template.md brand/BRAND-BRAIN.example.md brand/brand.example.json tools/hooklab/SKILL.md tools/ad-images/scripts/render.mjs tools/ad-images/scripts/cta-colors.mjs tools/carousel-builder/bin/carousel.js tools/heygen-ad-videos/scripts/heygen.mjs tools/video-editor/index.js tools/launch-video/brag/SKILL.md tools/launch-video/brag-slim/SKILL.md agents/content-checker.md agents/content-copywriter.md agents/content-carousel-maker.md agents/content-director.md agents/content-hook-writer.md agents/content-image-maker.md agents/content-launch-video.md agents/content-video-editor.md agents/content-video-maker.md; do
+  for file in README.md DIRECTOR.md INSTALL-PROMPT.md AGENTS.md VERSION CHANGELOG.md package.json scripts/studio.mjs scripts/carousel.mjs scripts/install-files.mjs skill/SKILL.md docs/DATA-FORMATS.md brand/BRAND-BRAIN.template.md brand/BRAND-BRAIN.example.md brand/brand.example.json tools/hooklab/SKILL.md tools/ad-images/scripts/render.mjs tools/ad-images/scripts/cta-colors.mjs tools/carousel-builder/bin/carousel.js tools/heygen-ad-videos/scripts/heygen.mjs tools/video-editor/index.js tools/video-editor/hyperframes.js tools/video-editor/INSTALL-HYPERFRAMES.md scripts/hyperframes-setup.mjs tools/launch-video/brag/SKILL.md tools/launch-video/brag-slim/SKILL.md agents/content-checker.md agents/content-copywriter.md agents/content-carousel-maker.md agents/content-director.md agents/content-hook-writer.md agents/content-image-maker.md agents/content-launch-video.md agents/content-video-editor.md agents/content-video-maker.md; do
     if [ ! -f "$CHECK_ROOT/$file" ]; then echo "Required file: missing $file"; REQUIRED_STATUS=1; fi
   done
   set +e
@@ -41,6 +41,13 @@ mkdir -p "$DEST" "$HOME_DIR"
 "$NODE" "$SRC/scripts/install-files.mjs" "$SRC" "$DEST" "$HOME_DIR"
 # Kept for compatibility: the pinned carousel engine has zero npm dependencies.
 CONTENT_STUDIO_DIR="$DEST" "$NODE" "$DEST/scripts/studio.mjs" self-test --no-render
+
+# HyperFrames for the Video Editor is part of the standard install: Claude Code plugin
+# or Codex core skills, FFmpeg through Homebrew when missing, telemetry off in the shell
+# profile, then the doctor check. Anything it cannot install is named in one plain
+# sentence. It always lets the install finish; the repair prompt is
+# tools/video-editor/INSTALL-HYPERFRAMES.md. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
+"$NODE" "$DEST/scripts/hyperframes-setup.mjs" --home "$HOME_DIR" || echo "HyperFrames setup did not finish. Run the prompt in $DEST/tools/video-editor/INSTALL-HYPERFRAMES.md"
 
 # Weekly self-update: on by default, one line turns it off. It fast-forwards the
 # git clone this installer came from, never touches brand/, learnings/, runs/ or
