@@ -1,9 +1,9 @@
 {
   "name": "video-editor",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
-  "description": "Local, mechanical video-editing operations over ffmpeg. No network calls, no credentials.",
+  "description": "Local video editing over ffmpeg, long-to-short teasers, and HyperFrames checks. Never uploads, never spends, no credentials.",
   "main": "index.js",
   "scripts": {
     "demo": "node index.js demo"

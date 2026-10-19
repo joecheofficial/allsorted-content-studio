@@ -134,3 +134,17 @@ Carousel overwrite syntax:
 ```sh
 node scripts/carousel.mjs RUN_DIR --overwrite
 ```
+
+# Video Editor teaser plan
+
+`RUN_DIR/video/teaser-plan.json` records the moments picked for a long-to-short teaser. `make-teaser` accepts this file (or the same list inline) as `segments`. Times are seconds or `HH:MM:SS.mmm` on the source recording. Order is the order in the teaser. At most 20 segments; the total must stay within 180 seconds unless `maxSeconds` is raised (at most 600).
+
+```json
+{ "segments": [
+  { "start": "00:12:04.5", "end": "00:12:13", "label": "hook" },
+  { "start": 1830, "end": 1842.2, "label": "idea" },
+  { "start": "00:58:40", "end": "00:58:51", "label": "cta" }
+] }
+```
+
+`make-teaser` writes `teaser-<name>.mp4` and, when a transcript is given, `teaser-<name>.srt` on the teaser's own timeline (plus `teaser-<name>-captioned.mp4` with `burnCaptions`). It never overwrites an existing file.

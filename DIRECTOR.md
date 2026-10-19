@@ -26,7 +26,7 @@ Generate `brand/brand.json` from the source-of-truth Markdown using the schema i
 - Ad Images, with `content-image-maker`, returns checked image variants.
 - Carousel Builder, with `content-carousel-maker`, returns three to seven slides and a carousel spec.
 - HeyGen Ad Videos, with `content-video-maker`, returns three scripts, and renders only when connected and the user approved the cost.
-- Video Editor, with `content-video-editor`, returns local trimmed, resized, or captioned clips under `video/`.
+- Video Editor, with `content-video-editor`, returns local trimmed, resized, or captioned clips, long-to-short teasers, and HyperFrames edits under `video/`.
 - Launch Video, with `content-launch-video`, returns a 15 to 25 second launch video, a poster frame and share copy for a website or project, using the `brag` skill. It is organic content, not an ad, so it skips the ad handoff.
 
 The supporting `content-copywriter` returns one entry per creative in `copy/ads.json`, including an explicit `cta_type`. The `content-checker` returns each per-file check line and the contact sheet path.
@@ -36,6 +36,17 @@ The supporting `content-copywriter` returns one entry per creative in `copy/ads.
 Create the run with `node scripts/studio.mjs new-run <slug>`, record the request in `request.md`, then run `node scripts/studio.mjs brief <run-dir>`. This writes `brief.md` from the request and available brand/offer fields and lists unresolved items. Complete any remaining required details before assigning work. Per-image JSON inputs live under the run's `data/` folder and use `<slug>_<nn>_<template>_<ratio>.json`. One brief is shared by all workers.
 
 Where sub-agents are supported, fan out hook writing first. Give the chosen hook angles and same brief to the copywriter. Then assign each requested image, carousel, and video format to its worker. Keep assignments independent and specific. Otherwise, perform those same steps sequentially yourself. Give each worker `CONTENT_STUDIO_DIR` and the run directory. Workers save files beneath the run's `images/`, `carousel/`, `video/`, or `copy/` folder. Video Editor runs `check-video-tools` before any operation.
+
+## Video routing
+
+Send these to `content-video-editor`:
+
+- Trim, resize for a format, extract audio, or burn in a supplied `.srt`/`.vtt`: the FFmpeg operations.
+- "Turn this webinar (talk, podcast, live) recording into a short teaser", "cut a promo or highlight reel from this long video": the long-to-short path in `tools/video-editor/LONG-TO-SHORT.md`. The worker shows the moment plan before cutting; review that plan against the brief and approved evidence.
+- Animated or word-by-word captions, side graphics, motion titles, hook or end cards, a branded recut or polish of an existing clip: HyperFrames, with the prompts in `tools/video-editor/HYPERFRAMES-EDIT-PROMPTS.md`.
+- "Set up HyperFrames", "fix HyperFrames", or a self-test line that says HyperFrames is not ready: the setup prompt in `tools/video-editor/INSTALL-HYPERFRAMES.md`.
+
+If a job needs HyperFrames and `node tools/video-editor/index.js hyperframes` says it is not ready, the worker asks the user whether to run the setup prompt first. If the user declines, it delivers the FFmpeg version and says what that version lacks. HyperFrames output is a local draft: never `hyperframes publish`, never a cloud render. A script for a new talking-head video still goes to HeyGen Ad Videos; the Video Editor edits footage that already exists.
 
 The checker runs mechanical QA and builds the contact sheet. Read its report, the contact sheet image, and every failing image yourself. A passing QA report is necessary, not sufficient.
 

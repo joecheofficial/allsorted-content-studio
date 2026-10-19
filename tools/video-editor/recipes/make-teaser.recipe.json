@@ -1,0 +1,23 @@
+{
+  "id": "agent/video-editor/make-teaser",
+  "layer": "agent",
+  "owner": "video-editor",
+  "title": "Turn a long recording (webinar, talk, podcast) into a short edited teaser",
+  "tags": ["video-editor", "video", "webinar", "teaser", "long-to-short", "clips", "shorts", "reels"],
+  "phrases": [
+    "turn this webinar recording into a short teaser",
+    "make a teaser from this recording",
+    "cut a short promo from this long video",
+    "long video to short clip",
+    "make a highlight reel from this talk"
+  ],
+  "safety": {
+    "destructive": false,
+    "notes": "Never edits the original. Writes a new teaser (and its .srt) to an explicit output directory and refuses to overwrite. No model call, no upload."
+  },
+  "inputMode": "structured",
+  "requiredContext": [],
+  "outputMode": "text",
+  "fallbackPolicy": "worker_optional",
+  "handler": "./make-teaser.js"
+}

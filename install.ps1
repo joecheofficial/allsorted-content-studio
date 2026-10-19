@@ -20,7 +20,7 @@ if ([int]$version[0] -lt 20 -or ([int]$version[0] -eq 20 -and [int]$version[1] -
 if ($check) {
   $checkRoot=$src
   if (Test-Path (Join-Path $dir 'scripts/studio.mjs')) { $checkRoot=$dir }
-  $required=@('README.md','DIRECTOR.md','INSTALL-PROMPT.md','AGENTS.md','VERSION','CHANGELOG.md','package.json','scripts/studio.mjs','scripts/carousel.mjs','scripts/install-files.mjs','skill/SKILL.md','docs/DATA-FORMATS.md','brand/BRAND-BRAIN.template.md','brand/BRAND-BRAIN.example.md','brand/brand.example.json','tools/hooklab/SKILL.md','tools/ad-images/scripts/render.mjs','tools/ad-images/scripts/cta-colors.mjs','tools/carousel-builder/bin/carousel.js','tools/heygen-ad-videos/scripts/heygen.mjs','tools/video-editor/index.js','tools/launch-video/brag/SKILL.md','tools/launch-video/brag-slim/SKILL.md','agents/content-checker.md','agents/content-copywriter.md','agents/content-carousel-maker.md','agents/content-director.md','agents/content-hook-writer.md','agents/content-image-maker.md','agents/content-launch-video.md','agents/content-video-editor.md','agents/content-video-maker.md')
+  $required=@('README.md','DIRECTOR.md','INSTALL-PROMPT.md','AGENTS.md','VERSION','CHANGELOG.md','package.json','scripts/studio.mjs','scripts/carousel.mjs','scripts/install-files.mjs','skill/SKILL.md','docs/DATA-FORMATS.md','brand/BRAND-BRAIN.template.md','brand/BRAND-BRAIN.example.md','brand/brand.example.json','tools/hooklab/SKILL.md','tools/ad-images/scripts/render.mjs','tools/ad-images/scripts/cta-colors.mjs','tools/carousel-builder/bin/carousel.js','tools/heygen-ad-videos/scripts/heygen.mjs','tools/video-editor/index.js','tools/video-editor/hyperframes.js','tools/video-editor/INSTALL-HYPERFRAMES.md','scripts/hyperframes-setup.mjs','tools/launch-video/brag/SKILL.md','tools/launch-video/brag-slim/SKILL.md','agents/content-checker.md','agents/content-copywriter.md','agents/content-carousel-maker.md','agents/content-director.md','agents/content-hook-writer.md','agents/content-image-maker.md','agents/content-launch-video.md','agents/content-video-editor.md','agents/content-video-maker.md')
   $missing=$false
   foreach ($file in $required) { if (-not (Test-Path (Join-Path $checkRoot $file))) { Write-Output "Required file: missing $file"; $missing=$true } }
   $env:CONTENT_STUDIO_DIR=$checkRoot
@@ -73,3 +73,8 @@ if ($env:CONTENT_STUDIO_SKIP_UPDATES -eq '1' -or $env:ALLSORTED_AUTO_UPDATE -eq 
   & $node.Source (Join-Path $updateRoot 'scripts/self-update.js') --register
   if ($LASTEXITCODE -ne 0) { Write-Output "Weekly updates could not be scheduled. Try later: node `"$(Join-Path $updateRoot 'scripts/self-update.js')`" --register" }
 }
+
+# HyperFrames for the Video Editor is part of the standard install (see install.sh).
+# It always lets the install finish. CONTENT_STUDIO_SKIP_HYPERFRAMES=1 skips it.
+& $node.Source (Join-Path $dir 'scripts/hyperframes-setup.mjs') --home $installHome
+if ($LASTEXITCODE -ne 0) { Write-Output "HyperFrames setup did not finish. Run the prompt in $(Join-Path $dir 'tools/video-editor/INSTALL-HYPERFRAMES.md')" }

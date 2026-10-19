@@ -1,0 +1,22 @@
+{
+  "id": "agent/video-editor/read-transcript",
+  "layer": "agent",
+  "owner": "video-editor",
+  "title": "Read a recording's transcript with timestamps to pick teaser moments",
+  "tags": ["video-editor", "video", "transcript", "webinar", "long-to-short", "teaser"],
+  "phrases": [
+    "read the transcript of this webinar",
+    "find the best moments in this recording",
+    "show me the transcript with timestamps",
+    "which parts of this talk would make a good teaser"
+  ],
+  "safety": {
+    "destructive": false,
+    "notes": "Reads an .srt or .vtt file. Writes a timed text copy only when an output directory is named, and never overwrites."
+  },
+  "inputMode": "structured",
+  "requiredContext": [],
+  "outputMode": "text",
+  "fallbackPolicy": "worker_optional",
+  "handler": "./read-transcript.js"
+}

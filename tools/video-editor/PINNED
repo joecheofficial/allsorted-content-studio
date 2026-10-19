@@ -1,4 +1,5 @@
 source: allsorted-dist/video-editor/module/video-editor
-version: 1.2.1
-commit: 8ce7d20
-date: 2026-10-02
+version: 1.4.1
+studio: Content Studio additions (HyperFrames setup, long-to-short teaser)
+commit: b8b37d6
+date: 2026-10-19

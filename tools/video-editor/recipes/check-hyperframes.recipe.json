@@ -1,0 +1,24 @@
+{
+  "id": "agent/video-editor/check-hyperframes",
+  "layer": "agent",
+  "owner": "video-editor",
+  "title": "Check whether HyperFrames is installed and ready",
+  "tags": ["video-editor", "video", "hyperframes", "diagnostics", "captions", "motion"],
+  "phrases": [
+    "is hyperframes installed",
+    "check hyperframes",
+    "set up hyperframes",
+    "can I make animated captions",
+    "can I add motion titles and side graphics to a video",
+    "what do I need for animated video graphics"
+  ],
+  "safety": {
+    "destructive": false,
+    "notes": "Reads local files and PATH only. Installs, renders and uploads nothing."
+  },
+  "inputMode": "structured",
+  "requiredContext": [],
+  "outputMode": "text",
+  "fallbackPolicy": "worker_optional",
+  "handler": "./check-hyperframes.js"
+}
