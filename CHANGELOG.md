@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1 (2026-10-21)
+
+- Weekly updater: it now works when the folder is reached through a differently capitalised path on a Mac or Windows (it used to say the folder "sits inside a larger repository"), and a copy cloned before an upstream history rewrite is recognised and offered a safe, backed-up `node scripts/self-update.js --realign` instead of a permanent "has your own commits" warning.
+
 ## 1.3.0 (2026-10-19)
 
 - Video Editor upgraded. HyperFrames (HeyGen's open-source HTML-to-MP4 renderer, Apache-2.0) is now part of the standard install: the installers add the Claude Code plugin or the Codex core skills, install FFmpeg with Homebrew when it is missing, turn telemetry off in your shell profile, run the doctor check and print a result table. Anything that needs you is named in one plain sentence. `CONTENT_STUDIO_SKIP_HYPERFRAMES=1` leaves it out.
